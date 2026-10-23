@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Business data — never commit real customers, invoices or backups
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local / OS files
+.claude/
+.DS_Store
+*.log
+.env
+.env.*
