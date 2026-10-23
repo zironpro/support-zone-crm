@@ -78,6 +78,16 @@ const range = (q) => {
   return { from: L.dateOr(q.from, R.monthStart(to)), to };
 };
 
+// Used by the Docker / Dokploy health check.
+app.get('/healthz', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true });
+  } catch {
+    res.status(503).json({ ok: false });
+  }
+});
+
 // ---------- setup & auth ----------
 const needsSetup = () => db.prepare('SELECT COUNT(*) n FROM users').get().n === 0;
 
@@ -393,7 +403,7 @@ app.get('/api/backup', auth, owner, (req, res, next) => {
 // ---------- print & public verification ----------
 function baseUrl(req) {
   const s = getSettings();
-  return (s.public_url || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  return (s.public_url || process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
 }
 
 app.get('/print/invoice/:id', async (req, res, next) => {
@@ -426,7 +436,21 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`Support Zone CRM running at http://localhost:${PORT}`));
+  const server = app.listen(PORT, () => console.log(`Support Zone CRM running at http://localhost:${PORT}`));
+  // On redeploy the container gets SIGTERM: finish open requests and close the database cleanly.
+  const shutdown = (signal) => {
+    console.log(`${signal} received, shutting down`);
+    server.close(() => {
+      db.close();
+      process.exit(0);
+    });
+    setTimeout(() => {
+      try { db.close(); } catch { /* already closed */ }
+      process.exit(0);
+    }, 8000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 module.exports = app;

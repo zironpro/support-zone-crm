@@ -98,6 +98,26 @@ Run it on a small VPS or an office PC that stays on:
   regularly and keep copies off the machine.
 - Keep it running with a process manager such as `pm2` or a systemd service.
 
+## Deploy on Dokploy
+
+The repo includes a `Dockerfile`, so Dokploy can build it directly.
+
+1. In Dokploy, open your project → **Create Service → Application** (name it `support-zone-crm`).
+2. **Provider**: GitHub (if the Dokploy GitHub App can see the `zironpro` org) → repository `support-zone-crm`, branch `main`.
+   Or use the **Git** provider with `git@github.com:zironpro/support-zone-crm.git` and an SSH key from Dokploy
+   (Settings → SSH Keys) added on GitHub as a read-only deploy key.
+3. **Build Type**: `Dockerfile` (path `Dockerfile`).
+4. **Advanced → Volumes**: add a **Volume mount**, name `support-zone-crm-data`, mount path **`/app/data`**.
+   This is where the database lives — without it every redeploy starts with an empty CRM.
+5. **Environment**: `PUBLIC_URL=https://your-crm-domain` (used in the invoice QR codes). `PORT`, `DB_PATH` and `TZ` are set in the image.
+6. **Domains**: add your domain, container port **3000**, HTTPS on with Let's Encrypt. Point the domain's DNS A record at the Dokploy server.
+7. **Deploy**, open the domain and create the owner account on the first-time setup screen.
+
+Notes:
+- Run **one** instance only (the database is a single SQLite file).
+- The container reports health at `/healthz`.
+- Take regular backups from **Settings → Download backup** (or Dokploy volume backups if you have S3 set up).
+
 ## Branding
 
 The app uses the Support Zone logo (`public/brand/logo.png`) and colours: sky blue `#2ea9d8` → deep blue `#2271bc` gradient, with near-black `#1e1e1e`.
