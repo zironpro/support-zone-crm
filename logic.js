@@ -234,12 +234,30 @@ function computeTotals(items, discountIn, vatRate) {
   return { govt_total, service_total, discount, vat_amount, total };
 }
 
+// Which parts each kind of user earns. A part someone does not earn goes to the company.
+//   commission agent: the "brought the client" part and the "did the work" part
+//   sales agent:      only the "brought the client" part
+//   salaried staff and the owner: nothing (it is all company money)
+const EARNS = {
+  commission: { source: true, worker: true },
+  sales: { source: true, worker: false },
+  salaried: { source: false, worker: false },
+};
+function earnsFn() {
+  const users = new Map(db.prepare('SELECT id, role, agent_type FROM users').all().map((u) => [u.id, u]));
+  return (userId, role) => {
+    const u = users.get(userId);
+    return !!u && u.role !== 'owner' && !!EARNS[u.agent_type]?.[role];
+  };
+}
+
 // Splits each line's profit (service fee after its part of the discount):
-//   standard line, client brought by an agent: 1/3 company, 1/3 who brought the client, 1/3 who did the work
+//   standard line, client brought by someone: 1/3 company, 1/3 who brought the client, 1/3 who did the work
 //   standard line, walk-in (nobody brought the client): 1/2 company, 1/2 who did the work
 //   company line (e.g. photocopy): 100% company
-// The same person can be both "brought" and "did the work" and then gets 2/3. Rounding leftovers go to the company.
-function computeShares(items, discount, sourceId) {
+// Then any part the person does not earn (see EARNS) moves to the company. They keep a 0 row so
+// reports still count the client / job as theirs. Rounding leftovers go to the company.
+function computeShares(items, discount, sourceId, earns = () => true) {
   const lines = items.map((it) => it.service_fee * it.qty);
   const serviceTotal = lines.reduce((a, b) => a + b, 0);
   const disc = lines.map((l) => (serviceTotal ? Math.floor((discount * l) / serviceTotal) : 0));
@@ -263,13 +281,15 @@ function computeShares(items, discount, sourceId) {
       );
     }
   });
-  return rows;
+  return rows.flatMap((r) => (r.user_id && !earns(r.user_id, r.role)
+    ? [{ ...r, amount: 0 }, { item: r.item, user_id: null, role: 'company', amount: r.amount }]
+    : [r]));
 }
 
 function postShares(invoiceId, items, discount, sourceId) {
   db.prepare('DELETE FROM invoice_shares WHERE invoice_id = ?').run(invoiceId);
   const stmt = db.prepare('INSERT INTO invoice_shares (invoice_id, item_id, user_id, role, amount) VALUES (?,?,?,?,?)');
-  for (const r of computeShares(items, discount, sourceId)) stmt.run(invoiceId, r.item.id, r.user_id, r.role, r.amount);
+  for (const r of computeShares(items, discount, sourceId, earnsFn())) stmt.run(invoiceId, r.item.id, r.user_id, r.role, r.amount);
 }
 
 // Make sure each wallet / card has enough available balance for the government fees.

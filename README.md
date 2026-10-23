@@ -10,8 +10,8 @@ ready to switch on later.
 
 | Need | How it works |
 |---|---|
-| Owner, sales agents, commission agents | **Owner** sees everything. **Sales agents** and **commission agents** create customers and invoices, take payments, and see only the invoices they prepared, brought the client for, or worked on — plus their own account. |
-| Profit sharing | Each invoice records **who brought the client** and, per service line, **who did the work**. The service-fee profit is split ⅓ company, ⅓ who brought the client, ⅓ who did the work (same person gets ⅔). **Walk-in** clients: 50% who did the work, 50% company. **Company-only** services such as the photocopy / Xerox machine: 100% company. A "Miscellaneous work" service covers odd jobs. |
+| Owner, sales agents, commission agents, salaried staff | **Owner** sees everything. **Sales agents**, **commission agents** and **salaried staff** create customers and invoices, take payments, and see only the invoices they prepared, brought the client for, or worked on — plus their own account. |
+| Profit sharing | Each invoice records **who brought the client** and, per service line, **who did the work**. Commission agents earn ⅓ for bringing a client and ⅓ for doing the work (½ on walk-ins); sales agents earn ⅓ only for bringing a client; salaried staff earn nothing — every part not earned goes to the company (see the rules below). **Company-only** services such as the photocopy / Xerox machine: 100% company. A "Miscellaneous work" service covers odd jobs. |
 | Agents keep the cash | When an agent collects cash it can stay with them ("Kept by me"). Their **account** shows: cash kept − their profit share − what they already paid in = what they owe the company. They pay it back by handing over cash or **topping up a company wallet**; the owner records that under **Agent accounts → Receive**. The company pays out shares with **Pay agent**. |
 | Private customers | Agents only see customers **they added** or **brought in**, plus customers the owner marks **Shared** (the Walk-in customer is shared). If an agent tries to add a mobile number or Emirates ID that already belongs to another agent's customer, it is blocked and they are told to ask the owner. The owner sees every customer, who added it, and can share it or reassign it with "Client brought by". On shared customers, agents only see totals from their own invoices. |
 | Shared wallets | Everyone uses the same company wallets/cards. Agents don't see the company balances — only the govt-fee deductions for jobs they did. |
@@ -57,14 +57,22 @@ To start fresh, stop the server and delete the `data/` folder.
 
 ## Profit sharing rules
 
-| Situation | Company | Brought the client | Did the work |
-|---|---|---|---|
-| Client brought by an agent | ⅓ | ⅓ | ⅓ |
-| Same agent brought the client and did the work | ⅓ | ⅔ (one person) | |
-| Walk-in (nobody brought the client) | 50% | — | 50% |
-| Company-only service (e.g. photocopy) | 100% | — | — |
+Each service line's profit is split in parts: ⅓ for whoever **brought the client**, ⅓ for whoever **did the work**, ⅓ for the company
+(walk-in: ½ for who did the work, ½ company). Then each part goes to the person only if their type earns it — otherwise it goes to the company:
+
+| User type | Brought the client | Did the work |
+|---|---|---|
+| Commission agent | ⅓ | ⅓ (½ on a walk-in) |
+| Sales agent | ⅓ | — (company) |
+| Salaried staff | — (company) | — (company) |
+| Owner | — (company) | — (company) |
+
+Examples on AED 30 profit: commission agent brought + worked → agent 20, company 10. Sales agent brought + worked → agent 10, company 20.
+Sales agent brought, salaried staff worked → agent 10, company 20. Salaried staff brought + worked → company 30. Photocopy → company 100%.
 
 - Shares are worked out on the service fee after any discount; rounding leftovers go to the company.
+- Salaried staff and sales agents still show their jobs in the profit-share report ("Jobs done"), with no share.
+- The rules apply when an invoice is issued (or re-saved by the owner); older invoices keep the split they were issued with.
 - A share is **earned** once the customer has paid the invoice in full; until then it shows as "waiting for payment".
 - Mark a service "Company 100%" under **Services & fees → Profit**. Only the owner can change this on an invoice line.
 - Set "Client brought by" on a customer once and it fills in automatically on their invoices.

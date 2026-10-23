@@ -5,6 +5,7 @@
 //   sara  / agent123   (Sales agent)
 //   rahul / agent123   (Sales agent)
 //   kamal / agent123   (Commission agent)
+//   fatima / agent123  (Salaried staff)
 process.env.TZ = process.env.TZ || 'Asia/Dubai';
 const { db, setSettings, today } = require('./db');
 const L = require('./logic');
@@ -38,8 +39,9 @@ const owner = mkUser('Owner', 'owner', 'owner123', 'owner');
 const sara = mkUser('Sara Ahmed', 'sara', 'agent123', 'agent');
 const rahul = mkUser('Rahul Menon', 'rahul', 'agent123', 'agent');
 const kamal = mkUser('Kamal Hassan', 'kamal', 'agent123', 'agent', 'commission');
-const staff = [sara, rahul];
-const allAgents = [sara, rahul, kamal];
+const fatima = mkUser('Fatima Noor', 'fatima', 'agent123', 'agent', 'salaried');
+const staff = [sara, rahul, fatima];
+const allAgents = [sara, rahul, kamal, fatima];
 
 const start = addDays(today(), -60);
 const acc = (name, type, opening, extra = {}) => L.saveAccount({ name, type, opening_balance: AED(opening), date: start, ...extra }, owner);
@@ -89,7 +91,7 @@ for (let i = 0; i < 45; i++) {
   const eid = rand() < 0.7 ? `784-19${Math.floor(rand() * 40 + 60)}-${String(Math.floor(rand() * 9000000) + 1000000)}-${Math.floor(rand() * 10)}` : null;
   const r = rand();
   const broughtBy = r < 0.25 ? kamal.id : r < 0.35 ? sara.id : r < 0.45 ? rahul.id : null; // the rest came in by themselves
-  const addedBy = broughtBy || pick([owner, sara, rahul]).id; // only this person (and who brought them) can see the customer
+  const addedBy = broughtBy || pick([owner, sara, rahul, fatima]).id; // only this person (and who brought them) can see the customer
   customers.push(Number(db.prepare('INSERT INTO customers (name, phone, emirates_id, company, agent_id, created_by) VALUES (?,?,?,?,?,?)').run(name, phone, eid, pick(companies), broughtBy, addedBy).lastInsertRowid));
 }
 
@@ -144,7 +146,7 @@ for (let day = 0; day <= 60; day++) {
     const method = rand() < 0.6 ? 'cash' : rand() < 0.7 ? 'card' : 'bank';
     const payAmount = r < 0.85 ? total : r < 0.95 ? Math.round(total / 2 / 100) * 100 : 0;
     // Agents keep the cash they collect; card and transfer payments go to the company bank.
-    const into = method !== 'cash' ? bank : agent === owner ? cash : 'held';
+    const into = method !== 'cash' ? bank : agent === owner || agent === fatima ? cash : 'held'; // salaried staff use the cash drawer
     const payment = payAmount > 0 ? { amount: payAmount, method, account_id: into, date } : null;
     try {
       const id = L.saveInvoice({ customer_id, date, items, discount, source_id, issue: true, payment }, agent);

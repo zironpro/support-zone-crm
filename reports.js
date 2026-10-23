@@ -229,9 +229,9 @@ function agentStatement(userId, from, to) {
   const events = [
     ...db.prepare(`SELECT p.date, p.id, 'collection' AS kind, p.amount, p.method, i.id AS invoice_id, i.number
       FROM payments p JOIN invoices i ON i.id = p.invoice_id WHERE p.held_by = ?`).all(userId),
-    ...db.prepare(`SELECT i.date, i.id, 'share' AS kind, -SUM(s.amount) AS amount, GROUP_CONCAT(DISTINCT s.role) AS roles, i.id AS invoice_id, i.number
+    ...db.prepare(`SELECT i.date, i.id, 'share' AS kind, -SUM(s.amount) AS amount, GROUP_CONCAT(DISTINCT CASE WHEN s.amount <> 0 THEN s.role END) AS roles, i.id AS invoice_id, i.number
       FROM invoice_shares s JOIN invoices i ON i.id = s.invoice_id AND i.status = 'issued' LEFT JOIN ${PAID} p ON p.invoice_id = i.id
-      WHERE s.user_id = ? AND COALESCE(p.paid,0) >= i.total GROUP BY i.id`).all(userId),
+      WHERE s.user_id = ? AND COALESCE(p.paid,0) >= i.total GROUP BY i.id HAVING SUM(s.amount) <> 0`).all(userId),
     ...db.prepare(`SELECT st.date, st.id, 'settlement' AS kind, -st.amount AS amount, st.note, a.name AS account_name
       FROM settlements st JOIN accounts a ON a.id = st.account_id WHERE st.user_id = ?`).all(userId),
   ].sort((a, b) => a.date.localeCompare(b.date) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.id - b.id);
@@ -246,7 +246,7 @@ function agentStatement(userId, from, to) {
   const pending = db.prepare(`
     SELECT i.id, i.number, i.date, i.total, COALESCE(p.paid,0) AS paid, SUM(s.amount) AS amount
     FROM invoice_shares s JOIN invoices i ON i.id = s.invoice_id AND i.status = 'issued' LEFT JOIN ${PAID} p ON p.invoice_id = i.id
-    WHERE s.user_id = ? AND COALESCE(p.paid,0) < i.total GROUP BY i.id ORDER BY i.date`).all(userId);
+    WHERE s.user_id = ? AND COALESCE(p.paid,0) < i.total GROUP BY i.id HAVING SUM(s.amount) <> 0 ORDER BY i.date`).all(userId);
   const wallet = db.prepare(`
     SELECT i.date, i.id AS invoice_id, i.number, it.name, it.description, it.qty * it.govt_fee AS amount, a.name AS account_name
     FROM invoice_items it JOIN invoices i ON i.id = it.invoice_id AND i.status = 'issued' JOIN accounts a ON a.id = it.account_id

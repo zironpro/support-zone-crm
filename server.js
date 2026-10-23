@@ -156,10 +156,10 @@ app.put('/api/settings', auth, owner, wrap((req) => {
 }));
 
 // ---------- users ----------
-// The UI offers three kinds of user: owner, sales agent (staff) and commission agent.
+// The UI offers four kinds of user: owner, sales agent, commission agent and salaried staff.
 function roleFrom(v) {
   if (v === 'owner') return { role: 'owner', agent_type: 'sales' };
-  return { role: 'agent', agent_type: v === 'commission' ? 'commission' : 'sales' };
+  return { role: 'agent', agent_type: ['commission', 'salaried'].includes(v) ? v : 'sales' };
 }
 app.get('/api/users', auth, wrap((req) => {
   const cols = req.user.role === 'owner' ? 'id, name, username, role, agent_type, phone, active, created_at' : 'id, name, role, agent_type';
