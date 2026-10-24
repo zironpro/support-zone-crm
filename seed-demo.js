@@ -35,7 +35,7 @@ const mkUser = (name, username, password, role, agentType = 'sales') => {
   const id = Number(db.prepare('INSERT INTO users (name, username, password_hash, role, agent_type) VALUES (?,?,?,?,?)').run(name, username, L.hashPassword(password), role, agentType).lastInsertRowid);
   return { id, name, role };
 };
-const owner = mkUser('Owner', 'owner', 'owner123', 'owner');
+const owner = mkUser('Owner', 'owner', 'owner123', 'owner', 'commission');
 const sara = mkUser('Sara Ahmed', 'sara', 'agent123', 'agent');
 const rahul = mkUser('Rahul Menon', 'rahul', 'agent123', 'agent');
 const kamal = mkUser('Kamal Hassan', 'kamal', 'agent123', 'agent', 'commission');

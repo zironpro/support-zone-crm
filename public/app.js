@@ -77,11 +77,12 @@ const EXPENSE_CATEGORIES = ['Rent', 'Salaries', 'Commission', 'Utilities (ADDC /
 const ROLE_LABEL = (u) => (u.role === 'owner' ? 'Owner' : { commission: 'Commission agent', salaried: 'Salaried staff' }[u.agent_type] || 'Sales agent');
 const SHARE_ROLE = { company: 'company', source: 'brought client', worker: 'did the work' };
 const RULE_LABEL = { standard: 'Shared', company: 'Company 100%' };
+const SHARE_TYPE_LABEL = { commission: 'Commission agent rules', sales: 'Sales agent rules', salaried: 'No share (salaried)' };
 // Same as EARNS in logic.js: which parts each kind of user earns; the rest goes to the company.
 const EARNS = { commission: { source: true, worker: true }, sales: { source: true, worker: false }, salaried: { source: false, worker: false } };
 const earnsFor = (users) => (id, role) => {
   const u = users.find((x) => x.id === id);
-  return !!u && u.role !== 'owner' && !!EARNS[u.agent_type]?.[role];
+  return !!u && !!EARNS[u.agent_type]?.[role];
 };
 
 // Same split as the server (computeShares in logic.js), for the live preview on the invoice form.
@@ -471,7 +472,7 @@ async function Dashboard(params, query, ctx) {
   const walletRow = (w) => `<tr class="click" data-go="#/wallets/${w.id}">
     <td><b>${esc(w.name)}</b> <span class="badge b-type">${TYPE_LABEL[w.type]}</span> ${w.low ? '<span class="badge b-low">Low</span>' : ''}</td>
     <td class="num ${w.available < 0 ? 'muted' : ''}">${money(w.available)}</td></tr>`;
-  const agentShares = d.shares.filter((s) => s.id && s.role !== 'owner').reduce((sum, s) => sum + s.total, 0);
+  const agentShares = d.shares.filter((s) => s.id).reduce((sum, s) => sum + s.total, 0); // agents and the owner personally
   const pct = Math.min(100, (d.vat.taxable / d.vat.mandatory) * 100);
   const over = d.vat.taxable >= d.vat.mandatory;
   const vol = d.vat.taxable >= d.vat.voluntary;
@@ -489,7 +490,7 @@ async function Dashboard(params, query, ctx) {
     <div class="grid g4">
       ${stat('Sales this month', d.month.total, `${d.month.invoices} invoices`)}
       ${stat('Service profit this month', d.month.profit, 'Service charges after discount')}
-      ${stat("Agents' shares this month", agentShares, '<a href="#/reports">Profit share report</a>')}
+      ${stat('Personal shares this month', agentShares, 'Agents + owner · <a href="#/reports">Profit share report</a>')}
       ${stat('Company net this month', d.month.profit - agentShares - d.expensesMonth, `After agents' shares and AED ${money(d.expensesMonth)} expenses`)}
     </div>
     <div class="grid g2">
@@ -500,7 +501,7 @@ async function Dashboard(params, query, ctx) {
         ${d.shares.length ? `<table class="t"><thead><tr><th>Person</th><th class="num">Clients brought</th><th class="num">Jobs done</th><th class="num">Share</th></tr></thead><tbody>
           ${d.shares.map((a) => `<tr ${a.id ? `class="click" data-go="#/agents/${a.id}"` : ''}><td><b>${esc(a.name)}</b></td><td class="num">${a.id ? a.brought : ''}</td><td class="num">${a.id ? a.jobs : ''}</td><td class="num"><b>${money(a.total)}</b></td></tr>`).join('')}
         </tbody></table>` : '<div class="empty">No sales this month yet</div>'}
-        <div class="bd small row between" style="border-top:1px solid var(--line)"><span>Agents hold for company: <b style="color:var(--red)">AED ${money(d.agentsOwe)}</b></span><span>Company owes agents: <b>AED ${money(d.companyOwes)}</b></span></div>
+        <div class="bd small row between" style="border-top:1px solid var(--line)"><span>Agents hold for company: <b style="color:var(--red)">AED ${money(d.agentsOwe)}</b></span><span>Company owes (agents &amp; owner): <b>AED ${money(d.companyOwes)}</b></span></div>
       </div></div>
     </div>
     <div class="grid g2">${recentCard(d.recent)}${vatCard}</div>
@@ -677,8 +678,8 @@ async function InvoiceEditor(params, query, ctx) {
   const renderItems = () => { itemsEl.innerHTML = st.items.map(rowHtml).join(''); };
   const sourceHint = () => {
     $('#source-hint').textContent = st.source_id
-      ? 'Who brought the client gets ⅓ (sales & commission agents). Who did the work gets ⅓ only if a commission agent. The rest goes to the company.'
-      : 'Walk-in: a commission agent who does the work gets 50%. Otherwise all profit goes to the company.';
+      ? 'Who brought the client gets ⅓ (owner, sales & commission agents). Who did the work gets ⅓ only if the owner or a commission agent. The rest goes to the company.'
+      : 'Walk-in: the owner or a commission agent who does the work gets 50%. Otherwise all profit goes to the company.';
   };
 
   function recalc() {
@@ -1161,15 +1162,15 @@ async function Agents(params, query, ctx) {
   setTitle('Agent accounts');
   const [rows, accounts] = await Promise.all([api('/agents'), api('/accounts')]);
   if (stale(ctx)) return;
-  const agents = rows.filter((a) => a.role !== 'owner' && (a.active || a.balance || a.pending));
+  const agents = rows.filter((a) => a.active || a.balance || a.pending); // the owner too: their personal share is separate from the company's
   const owe = agents.reduce((s, a) => s + Math.max(0, a.balance), 0);
   const owed = agents.reduce((s, a) => s + Math.max(0, -a.balance), 0);
   $('#view').innerHTML = `<div class="stack">
     <div class="note">Agents keep the cash they collect. What they owe = <b>cash kept − their profit share − what they already paid in</b>.
-      When an agent hands over cash or tops up a company wallet, use <b>Receive</b> and pick the cash drawer / wallet the money went into. Use <b>Pay agent</b> when the company pays out their share.</div>
+      When an agent hands over cash or tops up a company wallet, use <b>Receive</b> and pick the cash drawer / wallet the money went into. Use <b>Pay agent</b> when the company pays out their share — for your own row, that is taking your personal share out of the company.</div>
     <div class="grid g3">
       <div class="card stat"><div class="k">Agents hold for company</div><div class="v" style="color:var(--red)"><small>AED</small>${money(owe)}</div><div class="s">To hand over or top up wallets</div></div>
-      <div class="card stat"><div class="k">Company owes agents</div><div class="v"><small>AED</small>${money(owed)}</div><div class="s">Shares not yet paid out</div></div>
+      <div class="card stat"><div class="k">Company owes (agents &amp; owner)</div><div class="v"><small>AED</small>${money(owed)}</div><div class="s">Shares not yet paid out</div></div>
       <div class="card stat"><div class="k">Shares waiting for payment</div><div class="v"><small>AED</small>${money(agents.reduce((s, a) => s + a.pending, 0))}</div><div class="s">Customers have not fully paid</div></div>
     </div>
     <div class="card"><div class="bd flush table-wrap">${agents.length ? `<table class="t" id="tbl"><thead><tr><th>Agent</th><th class="num">Cash kept</th><th class="num">Share earned</th><th class="num">Paid in (net)</th><th class="num">Govt fees used</th><th class="num">Balance</th><th class="no-csv"></th></tr></thead><tbody>
@@ -1352,7 +1353,7 @@ async function Reports(params, query, ctx) {
     view.innerHTML = `${head}<form class="filters" id="flt"><input type="hidden" name="tab" value="sales">
       ${selectField('Show', 'by', [['share', 'Profit share by person'], ['agent', 'Invoices prepared by'], ['service', 'By service'], ['day', 'By day']], by)}${rangeInputs(from, to)}</form>
       <div class="card"><div class="bd flush table-wrap">${d.rows.length ? table : '<div class="empty">No issued invoices in this period</div>'}</div></div>
-      <p class="hint">Profit = service fees minus discounts. Who brought the client gets ⅓ (sales &amp; commission agents); who did the work gets ⅓ only if a commission agent (½ on walk-ins); salaried staff and the owner earn nothing personally; everything else is the company's. Company-only services are 100% company. Jobs done by people who earn nothing still count in “Jobs done”.</p>`;
+      <p class="hint">Profit = service fees minus discounts. Who brought the client gets ⅓ (owner, sales &amp; commission agents); who did the work gets ⅓ only if the owner or a commission agent (½ on walk-ins); salaried staff earn nothing; everything else is the company's own profit. Company-only services are 100% company. Jobs done by people who earn nothing still count in “Jobs done”.</p>`;
     bindFilters($('#flt'), '#/reports');
   }
 
@@ -1380,8 +1381,8 @@ async function Reports(params, query, ctx) {
           <tr><td>Service charges (${d.sales.n} invoices)</td><td>${money(d.sales.service)}</td></tr>
           <tr><td>Less: discounts</td><td>-${money(d.sales.discount)}</td></tr>
           <tr><td><b>Net service income</b></td><td><b>${money(d.revenue)}</b></td></tr>
-          <tr><td>Less: agents' profit shares</td><td>-${money(d.commissions)}</td></tr>
-          <tr><td><b>Company income</b></td><td><b>${money(d.companyIncome)}</b></td></tr>
+          <tr><td>Less: personal shares (agents &amp; owner)</td><td>-${money(d.commissions)}</td></tr>
+          <tr><td><b>Company's own income</b></td><td><b>${money(d.companyIncome)}</b></td></tr>
           <tr><td style="padding-top:14px"><b>Expenses</b></td><td></td></tr>
           ${d.expenses.map((e) => `<tr><td>${esc(e.category)}</td><td>-${money(e.amount)}</td></tr>`).join('') || '<tr><td class="muted">No expenses</td><td>0.00</td></tr>'}
           <tr><td><b>Total expenses</b></td><td><b>-${money(d.expenseTotal)}</b></td></tr>
@@ -1450,20 +1451,21 @@ async function Users(params, query, ctx) {
   setTitle('Users & agents', '<button class="btn primary" id="add-user">+ Add user</button>');
   const rows = await api('/users');
   if (stale(ctx)) return;
-  $('#view').innerHTML = `<div class="note" style="margin-bottom:14px"><b>Owner</b>: full access to wallets, agent accounts, expenses, reports and settings.
+  $('#view').innerHTML = `<div class="note" style="margin-bottom:14px"><b>Owner</b>: full access to wallets, agent accounts, expenses, reports and settings. The owner also earns a personal share like an agent (set by “Profit share”), kept separate from the company's profit.
     <b>Sales agent</b> and <b>Commission agent</b>: create customers &amp; invoices, record payments, and see only the invoices they prepared, brought the client for, or worked on — plus their own account.
     <b>Salaried staff</b> work the same way but earn no profit share — their part goes to the company, and cash they collect goes to the cash drawer by default.
     Profit share: <b>commission agents</b> earn ⅓ for bringing a client and ⅓ for doing the work (½ on walk-ins); <b>sales agents</b> earn ⅓ only for bringing a client.</div>
-    <div class="card"><div class="bd flush table-wrap"><table class="t"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Mobile</th><th>Status</th><th></th></tr></thead><tbody>
-    ${rows.map((u) => `<tr style="${u.active ? '' : 'opacity:.55'}"><td><b>${esc(u.name)}</b></td><td>${esc(u.username)}</td><td><span class="badge b-${u.role}">${ROLE_LABEL(u)}</span></td><td>${esc(u.phone || '')}</td>
-      <td>${u.active ? 'Active' : 'Disabled'}</td><td class="num nowrap">${u.role !== 'owner' ? `<a class="btn sm" href="#/agents/${u.id}">Account</a> ` : ''}<button class="btn sm" data-edit="${u.id}">Edit</button></td></tr>`).join('')}
+    <div class="card"><div class="bd flush table-wrap"><table class="t"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Profit share</th><th>Mobile</th><th>Status</th><th></th></tr></thead><tbody>
+    ${rows.map((u) => `<tr style="${u.active ? '' : 'opacity:.55'}"><td><b>${esc(u.name)}</b></td><td>${esc(u.username)}</td><td><span class="badge b-${u.role}">${ROLE_LABEL(u)}</span></td><td class="sub">${SHARE_TYPE_LABEL[u.agent_type] || ''}</td><td>${esc(u.phone || '')}</td>
+      <td>${u.active ? 'Active' : 'Disabled'}</td><td class="num nowrap"><a class="btn sm" href="#/agents/${u.id}">Account</a> <button class="btn sm" data-edit="${u.id}">Edit</button></td></tr>`).join('')}
     </tbody></table></div></div>`;
   const userModal = (u) => modal({
     title: u ? `Edit ${u.name}` : 'Add user',
     body: `<div class="form-grid">
       ${field('Full name *', 'name', { value: u?.name, required: true })}
       ${u ? `<label class="f">Username<input disabled value="${esc(u.username)}"></label>` : field('Username *', 'username', { required: true, attrs: 'autocapitalize="off"' })}
-      ${selectField('Role', 'role', [['sales', 'Sales agent — ⅓ for bringing clients'], ['commission', 'Commission agent — ⅓ for bringing + ⅓ for the work'], ['salaried', 'Salaried staff — no profit share'], ['owner', 'Owner']], u ? (u.role === 'owner' ? 'owner' : u.agent_type) : 'sales', { cls: 'full' })}
+      ${selectField('Access', 'role', [['agent', 'Agent / staff — own customers & invoices only'], ['owner', 'Owner — full access']], u?.role || 'agent', { cls: 'full' })}
+      ${selectField('Profit share', 'agent_type', [['sales', 'Sales agent — ⅓ for bringing clients'], ['commission', 'Commission agent — ⅓ for bringing + ⅓ for the work'], ['salaried', 'Salaried staff — no profit share']], u?.agent_type || 'sales', { cls: 'full', hint: 'Owners earn a personal share too — usually “Commission agent”.' })}
       ${field('Mobile', 'phone', { value: u?.phone })}
       ${field(u ? 'New password' : 'Password *', 'password', { type: 'password', required: !u, hint: u ? 'Leave blank to keep the current password' : 'At least 6 characters', attrs: 'autocomplete="new-password"', cls: 'full' })}
       ${u ? `<label class="f check full"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}> Active (can log in)</label>` : ''}
@@ -1505,7 +1507,8 @@ async function Settings(params, query, ctx) {
       <tr><td><b>Commission agent</b> did the work</td><td>⅓ to them (½ on a walk-in)</td></tr>
       <tr><td><b>Sales agent</b> brought the client</td><td>⅓ to them</td></tr>
       <tr><td><b>Sales agent</b> did the work</td><td>nothing — goes to company</td></tr>
-      <tr><td><b>Salaried staff</b> or owner, brought or did the work</td><td>nothing — goes to company</td></tr>
+      <tr><td><b>Owner</b> brought the client / did the work</td><td>⅓ / ⅓ to the owner personally (½ on a walk-in) — set in Users</td></tr>
+      <tr><td><b>Salaried staff</b>, brought or did the work</td><td>nothing — goes to company</td></tr>
       <tr><td>Everything not paid to a person</td><td>company</td></tr>
       <tr><td>Company-only services (e.g. photocopy)</td><td>100% company</td></tr>
     </table><p class="hint" style="margin:8px 0 0">Shares are worked out on the service fee after discount. Mark a service as “Company 100%” under Services &amp; fees.</p></div></div>

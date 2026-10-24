@@ -237,7 +237,9 @@ function computeTotals(items, discountIn, vatRate) {
 // Which parts each kind of user earns. A part someone does not earn goes to the company.
 //   commission agent: the "brought the client" part and the "did the work" part
 //   sales agent:      only the "brought the client" part
-//   salaried staff and the owner: nothing (it is all company money)
+//   salaried staff:   nothing
+// The owner earns too, by whichever of these types is set on the owner's user (commission by default),
+// so the company's own share stays separate from the owner's personal share.
 const EARNS = {
   commission: { source: true, worker: true },
   sales: { source: true, worker: false },
@@ -247,7 +249,7 @@ function earnsFn() {
   const users = new Map(db.prepare('SELECT id, role, agent_type FROM users').all().map((u) => [u.id, u]));
   return (userId, role) => {
     const u = users.get(userId);
-    return !!u && u.role !== 'owner' && !!EARNS[u.agent_type]?.[role];
+    return !!u && !!EARNS[u.agent_type]?.[role];
   };
 }
 

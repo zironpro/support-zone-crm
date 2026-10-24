@@ -11,7 +11,7 @@ ready to switch on later.
 | Need | How it works |
 |---|---|
 | Owner, sales agents, commission agents, salaried staff | **Owner** sees everything. **Sales agents**, **commission agents** and **salaried staff** create customers and invoices, take payments, and see only the invoices they prepared, brought the client for, or worked on — plus their own account. |
-| Profit sharing | Each invoice records **who brought the client** and, per service line, **who did the work**. Commission agents earn ⅓ for bringing a client and ⅓ for doing the work (½ on walk-ins); sales agents earn ⅓ only for bringing a client; salaried staff earn nothing — every part not earned goes to the company (see the rules below). **Company-only** services such as the photocopy / Xerox machine: 100% company. A "Miscellaneous work" service covers odd jobs. |
+| Profit sharing | Each invoice records **who brought the client** and, per service line, **who did the work**. Commission agents earn ⅓ for bringing a client and ⅓ for doing the work (½ on walk-ins); sales agents earn ⅓ only for bringing a client; the owner earns like a commission agent, kept apart from the company's own profit; salaried staff earn nothing — every part not earned goes to the company (see the rules below). **Company-only** services such as the photocopy / Xerox machine: 100% company. A "Miscellaneous work" service covers odd jobs. |
 | Agents keep the cash | When an agent collects cash it can stay with them ("Kept by me"). Their **account** shows: cash kept − their profit share − what they already paid in = what they owe the company. They pay it back by handing over cash or **topping up a company wallet**; the owner records that under **Agent accounts → Receive**. The company pays out shares with **Pay agent**. |
 | Private customers | Agents only see customers **they added** or **brought in**, plus customers the owner marks **Shared** (the Walk-in customer is shared). If an agent tries to add a mobile number or Emirates ID that already belongs to another agent's customer, it is blocked and they are told to ask the owner. The owner sees every customer, who added it, and can share it or reassign it with "Client brought by". On shared customers, agents only see totals from their own invoices. |
 | Shared wallets | Everyone uses the same company wallets/cards. Agents don't see the company balances — only the govt-fee deductions for jobs they did. |
@@ -65,10 +65,12 @@ Each service line's profit is split in parts: ⅓ for whoever **brought the clie
 | Commission agent | ⅓ | ⅓ (½ on a walk-in) |
 | Sales agent | ⅓ | — (company) |
 | Salaried staff | — (company) | — (company) |
-| Owner | — (company) | — (company) |
+| Owner | ⅓ | ⅓ (½ on a walk-in) — owner's personal share, by default the commission agent rules |
 
 Examples on AED 30 profit: commission agent brought + worked → agent 20, company 10. Sales agent brought + worked → agent 10, company 20.
-Sales agent brought, salaried staff worked → agent 10, company 20. Salaried staff brought + worked → company 30. Photocopy → company 100%.
+Sales agent brought, salaried staff worked → agent 10, company 20. Salaried staff brought + worked → company 30. Owner brought + worked → owner 20, company 10. Photocopy → company 100%.
+
+The owner's personal share is kept apart from the company's own profit: the P&L shows "Company's own income" after all personal shares, and the owner has an account under **Agent accounts** like everyone else (use **Pay agent** on it to take the share out).
 
 - Shares are worked out on the service fee after any discount; rounding leftovers go to the company.
 - Salaried staff and sales agents still show their jobs in the profit-share report ("Jobs done"), with no share.

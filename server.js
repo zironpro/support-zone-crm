@@ -101,7 +101,7 @@ app.post('/api/setup', wrap((req, res) => {
   L.validatePassword(b.password);
   const userId = tx(() => {
     if (L.str(b.company_name)) setSettings({ company_name: L.str(b.company_name, 150) });
-    const r = db.prepare(`INSERT INTO users (name, username, password_hash, role) VALUES (?,?,?,'owner')`).run(name, username, L.hashPassword(b.password));
+    const r = db.prepare(`INSERT INTO users (name, username, password_hash, role, agent_type) VALUES (?,?,?,'owner','commission')`).run(name, username, L.hashPassword(b.password));
     db.prepare(`INSERT INTO accounts (name, type) VALUES ('Cash Drawer','cash')`).run();
     db.prepare(`INSERT INTO customers (name, notes, shared) VALUES ('Walk-in Customer','Default customer for counter sales', 1)`).run();
     return Number(r.lastInsertRowid);
@@ -156,10 +156,12 @@ app.put('/api/settings', auth, owner, wrap((req) => {
 }));
 
 // ---------- users ----------
-// The UI offers four kinds of user: owner, sales agent, commission agent and salaried staff.
-function roleFrom(v) {
-  if (v === 'owner') return { role: 'owner', agent_type: 'sales' };
-  return { role: 'agent', agent_type: ['commission', 'salaried'].includes(v) ? v : 'sales' };
+// role = access (owner sees everything, agent sees their own work); agent_type = profit share rules.
+function roleFrom(b) {
+  const role = b.role === 'owner' ? 'owner' : 'agent';
+  const types = ['commission', 'sales', 'salaried'];
+  const agent_type = types.includes(b.agent_type) ? b.agent_type : types.includes(b.role) ? b.role : role === 'owner' ? 'commission' : 'sales';
+  return { role, agent_type };
 }
 app.get('/api/users', auth, wrap((req) => {
   const cols = req.user.role === 'owner' ? 'id, name, username, role, agent_type, phone, active, created_at' : 'id, name, role, agent_type';
@@ -172,7 +174,7 @@ app.post('/api/users', auth, owner, wrap((req) => {
   if (!name || !username) throw L.bad('Name and username are required');
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(username)) throw L.bad('That username is taken');
   L.validatePassword(b.password);
-  const { role, agent_type } = roleFrom(b.role);
+  const { role, agent_type } = roleFrom(b);
   const r = db.prepare('INSERT INTO users (name, username, password_hash, role, agent_type, phone) VALUES (?,?,?,?,?,?)').run(name, username, L.hashPassword(b.password), role, agent_type, L.str(b.phone, 30));
   return { id: Number(r.lastInsertRowid) };
 }));
@@ -182,7 +184,7 @@ app.put('/api/users/:id', auth, owner, wrap((req) => {
   const b = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE id = ?').get(uid);
   if (!u) throw L.notFound('User');
-  const { role, agent_type } = roleFrom(b.role);
+  const { role, agent_type } = roleFrom(b);
   const active = b.active === false || b.active === 0 || b.active === '0' ? 0 : 1;
   if (u.role === 'owner' && (role !== 'owner' || !active)) {
     const owners = db.prepare(`SELECT COUNT(*) n FROM users WHERE role = 'owner' AND active = 1`).get().n;

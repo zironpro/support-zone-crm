@@ -69,7 +69,7 @@ function dashboard(user) {
       WHERE i.status = 'issued' AND s.user_id = ? AND i.date BETWEEN ? AND ?`).get(user.id, m, t).v;
   } else {
     out.shares = salesByShare(user, m, t).rows;
-    const agents = agentBalances().filter((a) => a.role !== 'owner');
+    const agents = agentBalances();
     out.agentsOwe = agents.reduce((sum, a) => sum + Math.max(0, a.balance), 0);
     out.companyOwes = agents.reduce((sum, a) => sum + Math.max(0, -a.balance), 0);
     out.vat = vatTracker();
@@ -126,10 +126,10 @@ function profitAndLoss(from, to) {
   const expenses = db.prepare(`SELECT category, SUM(amount) amount, COUNT(*) n FROM expenses WHERE date BETWEEN ? AND ? GROUP BY category ORDER BY amount DESC`).all(from, to);
   const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
   const revenue = sales.service - sales.discount;
-  // Shares paid to agents are a cost to the company; the owner's own shares stay with the business.
+  // Personal shares (agents and the owner as an agent) come off; what is left is the company's own profit.
   const commissions = db.prepare(`
     SELECT COALESCE(SUM(s.amount),0) v FROM invoice_shares s JOIN invoices i ON i.id = s.invoice_id JOIN users u ON u.id = s.user_id
-    WHERE i.status = 'issued' AND u.role != 'owner' AND i.date BETWEEN ? AND ?`).get(from, to).v;
+    WHERE i.status = 'issued' AND i.date BETWEEN ? AND ?`).get(from, to).v;
   const companyIncome = revenue - commissions;
   return { from, to, sales, revenue, commissions, companyIncome, govtPaid, expenses, expenseTotal, net: companyIncome - expenseTotal };
 }
@@ -187,7 +187,7 @@ function statement(accountId, from, to) {
 // Profit share per person (and the company) for issued invoices in the period.
 function salesByShare(user, from, to) {
   const rows = db.prepare(`
-    SELECT s.user_id AS id, COALESCE(u.name, 'Company (owner account)') AS name, u.role, u.agent_type,
+    SELECT s.user_id AS id, COALESCE(u.name, 'Company') AS name, u.role, u.agent_type,
            COUNT(DISTINCT CASE WHEN s.role = 'source' THEN s.invoice_id END) AS brought,
            COUNT(DISTINCT CASE WHEN s.role = 'worker' THEN s.item_id END) AS jobs,
            COALESCE(SUM(CASE WHEN s.role = 'source' THEN s.amount END),0) AS as_source,

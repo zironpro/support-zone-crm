@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
   username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('owner','agent')),
-  agent_type    TEXT NOT NULL DEFAULT 'sales',   -- agents: 'sales' (staff) or 'commission'
+  agent_type    TEXT NOT NULL DEFAULT 'sales',   -- profit share rules: 'commission', 'sales' or 'salaried' (owners too)
   phone         TEXT,
   active        INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -236,6 +236,10 @@ function migrate() {
       db.exec(`INSERT INTO ${t} (${cols}) SELECT ${cols} FROM ${t}_old; DROP TABLE ${t}_old;`);
     }
     db.exec(INDEXES);
+    // v1: the owner now earns a personal share like an agent (commission agent rules by default).
+    if (db.prepare('PRAGMA user_version').get().user_version < 1) {
+      db.exec(`UPDATE users SET agent_type = 'commission' WHERE role = 'owner'; PRAGMA user_version = 1;`);
+    }
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
